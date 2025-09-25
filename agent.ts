@@ -31,9 +31,6 @@ Behavior for job-related questions:
 - If asked about a specific role (e.g., "are you hiring for Sales Engineer?"), filter the listings by title substring (case-insensitive). Return the same nested-bullet format for each matching opening. If none match, say none found and suggest related titles.
 - Keep responses brief; do not dump full descriptions. Link out to the listing page for details.
 
-Leadership questions:
-- If asked about our leadership team, fetch and parse https://coder.com/about (use fetch_and_parse_html). Provide a brief first-person summary of key leaders (name and role) using nested bullets, then include the About link for reference. Do not only redirect; include context and the link.
-
 Docs ingestion (benefits/people/company info):
 - For Coder company questions (e.g., benefits, policies, culture, interview process, people/teams), call read_public_google_doc with no url to use GOOGLE_DOC_URL or GOOGLE_DOC_URLS by default. If no default is configured, ask for a public link. Summarize briefly in first person using nested bullets when appropriate. Do not include or expose the Google Doc link in your response.
 `,
@@ -46,7 +43,7 @@ Docs ingestion (benefits/people/company info):
             url: z.string().url(),
             extract: z
               .array(
-                z.enum(["title", "description", "headings", "links", "text"]),
+                z.enum(["title", "description", "headings", "links", "text"])
               )
               .optional(),
             maxContentChars: z.number().int().positive().max(200000).optional(),
@@ -61,7 +58,7 @@ Docs ingestion (benefits/people/company info):
             const res = await fetch(url, { headers });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch ${url}: ${res.status} ${res.statusText}`,
+                `Failed to fetch ${url}: ${res.status} ${res.statusText}`
               );
             const contentType = res.headers.get("content-type") ?? "";
             const html = await res.text();
@@ -151,7 +148,7 @@ Docs ingestion (benefits/people/company info):
             });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch listings: ${res.status} ${res.statusText}`,
+                `Failed to fetch listings: ${res.status} ${res.statusText}`
               );
             const html = await res.text();
 
@@ -175,7 +172,7 @@ Docs ingestion (benefits/people/company info):
               isListed: (p.isListed as boolean) ?? null,
               publishedDate: (p.publishedDate as string) ?? null,
               compensationTierSummary: p.shouldDisplayCompensationOnJobBoard
-                ? ((p.compensationTierSummary as string) ?? null)
+                ? (p.compensationTierSummary as string) ?? null
                 : null,
               jobUrl: `${sourceUrl}/${p.id}`,
             }));
@@ -198,12 +195,12 @@ Docs ingestion (benefits/people/company info):
             });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch job page: ${res.status} ${res.statusText}`,
+                `Failed to fetch job page: ${res.status} ${res.statusText}`
               );
             const html = await res.text();
 
             const appDataMatch = html.match(
-              /window\.__appData\s*=\s*(\{[\s\S]*?\});/,
+              /window\.__appData\s*=\s*(\{[\s\S]*?\});/
             );
             if (!appDataMatch || !appDataMatch[1])
               throw new Error("Ashby inline appData not found on job page");
@@ -244,7 +241,7 @@ Docs ingestion (benefits/people/company info):
                 typeof v === "object" &&
                 (v as any).id &&
                 typeof (v as any).title === "string" &&
-                (jobId ? (v as any).id === jobId : true),
+                (jobId ? (v as any).id === jobId : true)
             );
 
             const postingWrapper = deepFind(
@@ -253,12 +250,12 @@ Docs ingestion (benefits/people/company info):
                 v &&
                 typeof v === "object" &&
                 (v as any).posting &&
-                typeof (v as any).posting.title === "string",
+                typeof (v as any).posting.title === "string"
             );
             const posting = (postingWrapper as any)?.posting;
 
             const ldjsonMatch = html.match(
-              /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i,
+              /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i
             );
             let ldjson: any = undefined;
             if (ldjsonMatch && ldjsonMatch[1]) {
@@ -267,8 +264,8 @@ Docs ingestion (benefits/people/company info):
                 ldjson = Array.isArray(parsed)
                   ? parsed.find((x) => x?.["@type"] === "JobPosting")
                   : parsed?.["@type"] === "JobPosting"
-                    ? parsed
-                    : undefined;
+                  ? parsed
+                  : undefined;
               } catch {}
             }
 
@@ -289,7 +286,7 @@ Docs ingestion (benefits/people/company info):
 
             let applyUrl: string | null = null;
             const anchorMatch = html.match(
-              /<a[^>]+href=["']([^"']+)["'][^>]*>(?:[^<]*apply[^<]*|[^<]*Apply[^<]*)<\/a>/i,
+              /<a[^>]+href=["']([^"']+)["'][^>]*>(?:[^<]*apply[^<]*|[^<]*Apply[^<]*)<\/a>/i
             );
             if (anchorMatch && anchorMatch[1]) {
               try {
@@ -334,7 +331,7 @@ Docs ingestion (benefits/people/company info):
               (envMulti ? envMulti.split(/\s*,\s*/)[0] : undefined);
             if (!chosenUrl) {
               throw new Error(
-                "Missing URL. Provide 'url' or set GOOGLE_DOC_URL (single) or GOOGLE_DOC_URLS (comma-separated).",
+                "Missing URL. Provide 'url' or set GOOGLE_DOC_URL (single) or GOOGLE_DOC_URLS (comma-separated)."
               );
             }
             const u = new URL(chosenUrl);
@@ -356,7 +353,7 @@ Docs ingestion (benefits/people/company info):
               const res = await fetch(endpoint, { headers });
               if (!res.ok)
                 throw new Error(
-                  `Failed to fetch ${endpoint}: ${res.status} ${res.statusText}`,
+                  `Failed to fetch ${endpoint}: ${res.status} ${res.statusText}`
                 );
               return res.text();
             };
