@@ -137,7 +137,9 @@ You have tools for:
             const appData = JSON.parse(jsonText as string);
 
             const postings =
-              (appData as any)?.jobPostingList?.jobPostings ?? [];
+              (appData as any)?.jobBoard?.jobPostings ??
+              (appData as any)?.jobPostingList?.jobPostings ??
+              [];
             const jobs = (postings as any[]).map((p: any) => ({
               id: p.id as string,
               title: (p.title as string) ?? "",
