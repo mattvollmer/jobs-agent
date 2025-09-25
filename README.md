@@ -12,6 +12,7 @@ Minimal Blink agent scaffold built with TypeScript and AI SDK v5.
 
 ## Behavior
 
+- Identity: The agent responds as "OllieBot" and does not reference vendor/model names (e.g., Claude, Anthropic). For provider/compute questions, it gives a brief non-technical reply and redirects to Coder job assistance.
 - Broad jobs queries (e.g., "what jobs are open?") return a concise nested-bullet summary:
   - Top-level bullet: job title
   - Sub-bullets: department/team, location, workplaceType (Remote/Hybrid/On-site), compensation (if available), and a link to the job listing.
