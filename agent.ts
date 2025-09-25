@@ -6,7 +6,7 @@ import { load } from "cheerio";
 export default blink.agent({
   async sendMessages({ messages }) {
     return streamText({
-      model: "anthropic/claude-sonnet-4",
+      model: "openai/gpt-oss-120b",
       system: `You are a basic agent the user will customize.
 
 You have tools for:
@@ -22,7 +22,7 @@ You have tools for:
             url: z.string().url(),
             extract: z
               .array(
-                z.enum(["title", "description", "headings", "links", "text"])
+                z.enum(["title", "description", "headings", "links", "text"]),
               )
               .optional(),
             maxContentChars: z.number().int().positive().max(200000).optional(),
@@ -37,7 +37,7 @@ You have tools for:
             const res = await fetch(url, { headers });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch ${url}: ${res.status} ${res.statusText}`
+                `Failed to fetch ${url}: ${res.status} ${res.statusText}`,
               );
             const contentType = res.headers.get("content-type") ?? "";
             const html = await res.text();
@@ -113,7 +113,8 @@ You have tools for:
         }),
 
         list_coder_jobs: tool({
-          description: "List open roles from Coder's AshbyHQ page.",
+          description:
+            "List open roles from Coder's AshbyHQ page (parses inline JSON, no JS).",
           inputSchema: z.object({}),
           execute: async () => {
             const sourceUrl = "https://jobs.ashbyhq.com/Coder";
@@ -126,43 +127,30 @@ You have tools for:
             });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch listings: ${res.status} ${res.statusText}`
+                `Failed to fetch listings: ${res.status} ${res.statusText}`,
               );
             const html = await res.text();
-            const $ = load(html);
 
-            const seen = new Set<string>();
-            const jobs: Array<{
-              title: string;
-              url: string;
-              location?: string | null;
-              team?: string | null;
-            }> = [];
+            const m = html.match(/window\.__appData\s*=\s*(\{[\s\S]*?\});/);
+            if (!m) throw new Error("Ashby inline appData not found");
+            const appData = JSON.parse(m[1]);
 
-            $("a[href]").each((_, el) => {
-              const href = $(el).attr("href") || "";
-              const absolute = href.startsWith("http")
-                ? href
-                : new URL(href, sourceUrl).toString();
-              if (!absolute.includes("jobs.ashbyhq.com/Coder/")) return;
-              const title = $(el).text().trim();
-              if (!title || seen.has(absolute)) return;
-
-              // Heuristic: try to pick nearby text for location/team
-              const card = $(el).closest("a, div, li, article");
-              const nearby = card.text().replace(/\s+/g, " ").trim();
-              let location: string | null = null;
-              let team: string | null = null;
-
-              // naive parsing hints
-              const locMatch = nearby.match(
-                /(Remote|Hybrid|On[- ]site|USA|United States|Canada|Europe|[A-Z][a-z]+, [A-Z]{2})/
-              );
-              if (locMatch) location = locMatch[0];
-
-              jobs.push({ title, url: absolute, location, team });
-              seen.add(absolute);
-            });
+            const postings = appData?.jobPostingList?.jobPostings ?? [];
+            const jobs = postings.map((p: any) => ({
+              id: p.id,
+              title: p.title,
+              department: p.departmentName ?? null,
+              team: p.teamName ?? null,
+              location: p.locationName ?? null,
+              workplaceType: p.workplaceType ?? null,
+              employmentType: p.employmentType ?? null,
+              isListed: p.isListed ?? null,
+              publishedDate: p.publishedDate ?? null,
+              compensationTierSummary: p.shouldDisplayCompensationOnJobBoard
+                ? (p.compensationTierSummary ?? null)
+                : null,
+              jobUrl: `${sourceUrl}/${p.id}`,
+            }));
 
             return { sourceUrl, count: jobs.length, jobs };
           },
@@ -170,7 +158,7 @@ You have tools for:
 
         get_coder_job_details: tool({
           description:
-            "Fetch details for a specific Coder job posting URL on AshbyHQ.",
+            "Fetch details for a specific Coder job posting URL on AshbyHQ (parses inline JSON).",
           inputSchema: z.object({ url: z.string().url() }),
           execute: async ({ url }) => {
             const res = await fetch(url, {
@@ -182,78 +170,123 @@ You have tools for:
             });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch job page: ${res.status} ${res.statusText}`
+                `Failed to fetch job page: ${res.status} ${res.statusText}`,
               );
             const html = await res.text();
-            const $ = load(html);
 
-            const title = (
-              $('meta[property="og:title"]').attr("content") ||
-              $("h1").first().text() ||
-              $("title").text() ||
-              ""
-            ).trim();
+            const appDataMatch = html.match(
+              /window\.__appData\s*=\s*(\{[\s\S]*?\});/,
+            );
+            if (!appDataMatch)
+              throw new Error("Ashby inline appData not found on job page");
+            const appData = JSON.parse(appDataMatch[1]);
 
-            const description = (
-              $('meta[name="description"]').attr("content") ||
-              $('meta[property="og:description"]').attr("content") ||
-              ""
-            ).trim();
+            const jobId = (() => {
+              try {
+                const u = new URL(url);
+                const parts = u.pathname.split("/").filter(Boolean);
+                return parts[parts.length - 1] ?? null;
+              } catch {
+                return null;
+              }
+            })();
 
-            // Try ld+json JobPosting for structured data
-            let structured: any = undefined;
-            try {
-              const rawLd = $('script[type="application/ld+json"]')
-                .first()
-                .text();
-              if (rawLd) {
-                const parsed = JSON.parse(rawLd);
-                if (Array.isArray(parsed)) {
-                  structured =
-                    parsed.find((x) => x && x["@type"] === "JobPosting") ||
-                    parsed[0];
-                } else {
-                  structured =
-                    parsed["@type"] === "JobPosting" ? parsed : parsed;
+            const deepFind = (
+              node: any,
+              fn: (v: any, k?: string) => boolean,
+            ): any => {
+              if (node == null) return undefined;
+              if (fn(node)) return node;
+              if (Array.isArray(node)) {
+                for (const item of node) {
+                  const r = deepFind(item, fn);
+                  if (r !== undefined) return r;
+                }
+              } else if (typeof node === "object") {
+                for (const k of Object.keys(node)) {
+                  const v = (node as any)[k];
+                  const r = deepFind(v, fn);
+                  if (r !== undefined) return r;
                 }
               }
-            } catch {}
+              return undefined;
+            };
 
-            // Extract main content text (fallback)
-            let text = $("body").text().replace(/\s+/g, " ").trim();
-            if (text.length > 20000) text = text.slice(0, 20000);
+            const jobPosting = deepFind(
+              appData,
+              (v) =>
+                v &&
+                typeof v === "object" &&
+                (v as any).id &&
+                typeof (v as any).title === "string" &&
+                (jobId ? (v as any).id === jobId : true),
+            );
 
-            // Attempt to find location and employment type
-            const location =
-              structured?.jobLocation?.address?.addressLocality ||
-              structured?.jobLocation?.address?.addressRegion ||
-              structured?.jobLocation?.address?.addressCountry ||
-              structured?.jobLocation?.address?.addressLocality ||
-              null;
+            const posting = deepFind(
+              appData,
+              (v, k) =>
+                v &&
+                typeof v === "object" &&
+                (v as any).posting &&
+                typeof (v as any).posting.title === "string",
+            )?.posting;
 
-            const employmentType = structured?.employmentType || null;
+            const ldjsonMatch = html.match(
+              /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i,
+            );
+            let ldjson: any = undefined;
+            if (ldjsonMatch) {
+              try {
+                const parsed = JSON.parse(ldjsonMatch[1]);
+                ldjson = Array.isArray(parsed)
+                  ? parsed.find((x) => x?.["@type"] === "JobPosting")
+                  : parsed?.["@type"] === "JobPosting"
+                    ? parsed
+                    : undefined;
+              } catch {}
+            }
 
-            // Apply URL
+            const base = (posting ?? jobPosting ?? {}) as any;
+
+            const title = base.title || ldjson?.title || "";
+            const descriptionHtml =
+              base.descriptionHtml || ldjson?.description || "";
+            const department = base.departmentName ?? null;
+            const team = base.teamName ?? null;
+            const location = base.locationName ?? null;
+            const employmentType =
+              base.employmentType ?? ldjson?.employmentType ?? null;
+            const publishedDate =
+              base.publishedDate ?? ldjson?.datePosted ?? null;
+            const compensationTierSummary =
+              base.compensationTierSummary ?? null;
+
+            // Build apply URL: first try anchor tags, then guess from job URL
             let applyUrl: string | null = null;
-            $("a[href]").each((_, el) => {
-              const href = $(el).attr("href") || "";
-              const text = $(el).text().toLowerCase();
-              if (text.includes("apply") || href.includes("ashby")) {
-                applyUrl = href.startsWith("http")
-                  ? href
-                  : new URL(href, url).toString();
-              }
-            });
+            const anchorMatch = html.match(
+              /<a[^>]+href=["']([^"']+)["'][^>]*>(?:[^<]*apply[^<]*|[^<]*Apply[^<]*)<\/a>/i,
+            );
+            if (anchorMatch) {
+              try {
+                const abs = anchorMatch[1];
+                applyUrl = abs.startsWith("http")
+                  ? abs
+                  : new URL(abs, url).toString();
+              } catch {}
+            }
 
             return {
+              id: jobId,
               url,
               title,
-              description,
+              department,
+              team,
               location,
               employmentType,
+              publishedDate,
+              compensationTierSummary,
+              descriptionHtml,
               applyUrl,
-              structured,
-              text,
             };
           },
         }),
