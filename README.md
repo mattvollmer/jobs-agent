@@ -12,6 +12,8 @@ Minimal Blink agent scaffold built with TypeScript and AI SDK v5.
 
 ## Behavior
 
+- Scope: The agent only assists with Coder (coder.com) topics and Coder job openings.
+  - Off-topic: For general chat or unrelated browsing, it politely reminds users that it is focused on Coder and Coder roles and offers to help with openings or role-specific questions.
 - Broad jobs queries (e.g., "what jobs are open?") return a concise nested-bullet summary:
   - Top-level bullet: job title
   - Sub-bullets: department/team, location, workplaceType (Remote/Hybrid/On-site), compensation (if available), and a link to the job listing.
