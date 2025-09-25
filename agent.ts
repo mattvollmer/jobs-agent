@@ -31,8 +31,8 @@ Behavior for job-related questions:
 - If asked about a specific role (e.g., "are you hiring for Sales Engineer?"), filter the listings by title substring (case-insensitive). Return the same nested-bullet format for each matching opening. If none match, say none found and suggest related titles.
 - Keep responses brief; do not dump full descriptions. Link out to the listing page for details.
 
-Leadership questions:
-- If asked about our leadership team, fetch and parse https://coder.com/about (use fetch_and_parse_html). Provide a brief first-person summary of key leaders (name and role) using nested bullets, then include the About link for reference. Do not only redirect; include context and the link.
+Docs ingestion (benefits/people/company info):
+- For Coder company questions (e.g., benefits, policies, culture, interview process, people/teams), call read_public_google_doc with no url to use GOOGLE_DOC_URL or GOOGLE_DOC_URLS by default. If no default is configured, ask for a public link. Summarize briefly in first person using nested bullets when appropriate. Do not include or expose the Google Doc link in your response.
 `,
       messages: convertToModelMessages(messages),
       tools: {
@@ -43,7 +43,7 @@ Leadership questions:
             url: z.string().url(),
             extract: z
               .array(
-                z.enum(["title", "description", "headings", "links", "text"]),
+                z.enum(["title", "description", "headings", "links", "text"])
               )
               .optional(),
             maxContentChars: z.number().int().positive().max(200000).optional(),
@@ -58,7 +58,7 @@ Leadership questions:
             const res = await fetch(url, { headers });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch ${url}: ${res.status} ${res.statusText}`,
+                `Failed to fetch ${url}: ${res.status} ${res.statusText}`
               );
             const contentType = res.headers.get("content-type") ?? "";
             const html = await res.text();
@@ -148,7 +148,7 @@ Leadership questions:
             });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch listings: ${res.status} ${res.statusText}`,
+                `Failed to fetch listings: ${res.status} ${res.statusText}`
               );
             const html = await res.text();
 
@@ -172,7 +172,7 @@ Leadership questions:
               isListed: (p.isListed as boolean) ?? null,
               publishedDate: (p.publishedDate as string) ?? null,
               compensationTierSummary: p.shouldDisplayCompensationOnJobBoard
-                ? ((p.compensationTierSummary as string) ?? null)
+                ? (p.compensationTierSummary as string) ?? null
                 : null,
               jobUrl: `${sourceUrl}/${p.id}`,
             }));
@@ -195,12 +195,12 @@ Leadership questions:
             });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch job page: ${res.status} ${res.statusText}`,
+                `Failed to fetch job page: ${res.status} ${res.statusText}`
               );
             const html = await res.text();
 
             const appDataMatch = html.match(
-              /window\.__appData\s*=\s*(\{[\s\S]*?\});/,
+              /window\.__appData\s*=\s*(\{[\s\S]*?\});/
             );
             if (!appDataMatch || !appDataMatch[1])
               throw new Error("Ashby inline appData not found on job page");
@@ -241,7 +241,7 @@ Leadership questions:
                 typeof v === "object" &&
                 (v as any).id &&
                 typeof (v as any).title === "string" &&
-                (jobId ? (v as any).id === jobId : true),
+                (jobId ? (v as any).id === jobId : true)
             );
 
             const postingWrapper = deepFind(
@@ -250,12 +250,12 @@ Leadership questions:
                 v &&
                 typeof v === "object" &&
                 (v as any).posting &&
-                typeof (v as any).posting.title === "string",
+                typeof (v as any).posting.title === "string"
             );
             const posting = (postingWrapper as any)?.posting;
 
             const ldjsonMatch = html.match(
-              /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i,
+              /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i
             );
             let ldjson: any = undefined;
             if (ldjsonMatch && ldjsonMatch[1]) {
@@ -264,8 +264,8 @@ Leadership questions:
                 ldjson = Array.isArray(parsed)
                   ? parsed.find((x) => x?.["@type"] === "JobPosting")
                   : parsed?.["@type"] === "JobPosting"
-                    ? parsed
-                    : undefined;
+                  ? parsed
+                  : undefined;
               } catch {}
             }
 
@@ -286,7 +286,7 @@ Leadership questions:
 
             let applyUrl: string | null = null;
             const anchorMatch = html.match(
-              /<a[^>]+href=["']([^"']+)["'][^>]*>(?:[^<]*apply[^<]*|[^<]*Apply[^<]*)<\/a>/i,
+              /<a[^>]+href=["']([^"']+)["'][^>]*>(?:[^<]*apply[^<]*|[^<]*Apply[^<]*)<\/a>/i
             );
             if (anchorMatch && anchorMatch[1]) {
               try {
@@ -309,6 +309,101 @@ Leadership questions:
               compensationTierSummary,
               descriptionHtml,
               applyUrl,
+            };
+          },
+        }),
+
+        read_public_google_doc: tool({
+          description:
+            "Read content from a public Google Docs link. If no url is provided, defaults to GOOGLE_DOC_URL or first in GOOGLE_DOC_URLS (comma-separated). Supports export as text or HTML. No auth required if the doc is public.",
+          inputSchema: z.object({
+            url: z.string().url().optional(),
+            format: z.enum(["txt", "html"]).optional(),
+            maxChars: z.number().int().positive().max(500000).optional(),
+          }),
+          execute: async ({ url, format, maxChars }) => {
+            // If URL not provided, try env vars
+            const envSingle = process.env.GOOGLE_DOC_URL;
+            const envMulti = process.env.GOOGLE_DOC_URLS; // comma-separated
+            const chosenUrl =
+              url ??
+              envSingle ??
+              (envMulti ? envMulti.split(/\s*,\s*/)[0] : undefined);
+            if (!chosenUrl) {
+              throw new Error(
+                "Missing URL. Provide 'url' or set GOOGLE_DOC_URL (single) or GOOGLE_DOC_URLS (comma-separated)."
+              );
+            }
+            const u = new URL(chosenUrl);
+            const sourceUrl = u.toString();
+            const fmt = format ?? "txt";
+            const headers = {
+              "User-Agent":
+                "jobs-agent/1.0 (+https://github.com/mattvollmer/jobs-agent)",
+              Accept:
+                fmt === "html"
+                  ? "text/html,application/xhtml+xml"
+                  : "text/plain, text/html;q=0.7",
+            } as const;
+
+            const mDoc = u.pathname.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+            const mPub = u.pathname.match(/\/document\/d\/e\/([a-zA-Z0-9_-]+)/);
+
+            const fetchText = async (endpoint: string) => {
+              const res = await fetch(endpoint, { headers });
+              if (!res.ok)
+                throw new Error(
+                  `Failed to fetch ${endpoint}: ${res.status} ${res.statusText}`
+                );
+              return res.text();
+            };
+
+            let content = "";
+            let mode: "export" | "published" | "raw" = "raw";
+            let usedUrl = sourceUrl;
+            if (mDoc && mDoc[1]) {
+              // Use export endpoint
+              const docId = mDoc[1];
+              const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=${fmt}`;
+              usedUrl = exportUrl;
+              content = await fetchText(exportUrl);
+              mode = "export";
+            } else if (mPub && mPub[1]) {
+              // Published to web link, fetch embedded HTML and extract text if txt requested
+              const pubId = mPub[1];
+              const pubUrl = `https://docs.google.com/document/d/e/${pubId}/pub?embedded=true`;
+              usedUrl = pubUrl;
+              const html = await fetchText(pubUrl);
+              if (fmt === "html") {
+                content = html;
+              } else {
+                const $ = load(html);
+                const text = $("body").text().replace(/\s+/g, " ").trim();
+                content = text;
+              }
+              mode = "published";
+            } else {
+              // Fallback: fetch whatever is at the URL (must be public) and extract
+              const raw = await fetchText(sourceUrl);
+              if (fmt === "html") {
+                content = raw;
+              } else {
+                const $ = load(raw);
+                content = $("body").text().replace(/\s+/g, " ").trim();
+              }
+              mode = "raw";
+            }
+
+            const limit = maxChars ?? (fmt === "html" ? 200000 : 100000);
+            if (content.length > limit) content = content.slice(0, limit);
+
+            return {
+              sourceUrl,
+              resolvedUrl: usedUrl,
+              mode,
+              format: fmt,
+              length: content.length,
+              content,
             };
           },
         }),
