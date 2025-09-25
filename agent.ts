@@ -132,22 +132,24 @@ You have tools for:
             const html = await res.text();
 
             const m = html.match(/window\.__appData\s*=\s*(\{[\s\S]*?\});/);
-            if (!m) throw new Error("Ashby inline appData not found");
-            const appData = JSON.parse(m[1]);
+            if (!m || !m[1]) throw new Error("Ashby inline appData not found");
+            const jsonText = m[1];
+            const appData = JSON.parse(jsonText as string);
 
-            const postings = appData?.jobPostingList?.jobPostings ?? [];
-            const jobs = postings.map((p: any) => ({
-              id: p.id,
-              title: p.title,
-              department: p.departmentName ?? null,
-              team: p.teamName ?? null,
-              location: p.locationName ?? null,
-              workplaceType: p.workplaceType ?? null,
-              employmentType: p.employmentType ?? null,
-              isListed: p.isListed ?? null,
-              publishedDate: p.publishedDate ?? null,
+            const postings =
+              (appData as any)?.jobPostingList?.jobPostings ?? [];
+            const jobs = (postings as any[]).map((p: any) => ({
+              id: p.id as string,
+              title: (p.title as string) ?? "",
+              department: (p.departmentName as string) ?? null,
+              team: (p.teamName as string) ?? null,
+              location: (p.locationName as string) ?? null,
+              workplaceType: (p.workplaceType as string) ?? null,
+              employmentType: (p.employmentType as string) ?? null,
+              isListed: (p.isListed as boolean) ?? null,
+              publishedDate: (p.publishedDate as string) ?? null,
               compensationTierSummary: p.shouldDisplayCompensationOnJobBoard
-                ? (p.compensationTierSummary ?? null)
+                ? ((p.compensationTierSummary as string) ?? null)
                 : null,
               jobUrl: `${sourceUrl}/${p.id}`,
             }));
@@ -177,9 +179,9 @@ You have tools for:
             const appDataMatch = html.match(
               /window\.__appData\s*=\s*(\{[\s\S]*?\});/,
             );
-            if (!appDataMatch)
+            if (!appDataMatch || !appDataMatch[1])
               throw new Error("Ashby inline appData not found on job page");
-            const appData = JSON.parse(appDataMatch[1]);
+            const appData = JSON.parse(appDataMatch[1] as string);
 
             const jobId = (() => {
               try {
@@ -191,10 +193,7 @@ You have tools for:
               }
             })();
 
-            const deepFind = (
-              node: any,
-              fn: (v: any, k?: string) => boolean,
-            ): any => {
+            const deepFind = (node: any, fn: (v: any) => boolean): any => {
               if (node == null) return undefined;
               if (fn(node)) return node;
               if (Array.isArray(node)) {
@@ -222,22 +221,23 @@ You have tools for:
                 (jobId ? (v as any).id === jobId : true),
             );
 
-            const posting = deepFind(
+            const postingWrapper = deepFind(
               appData,
-              (v, k) =>
+              (v) =>
                 v &&
                 typeof v === "object" &&
                 (v as any).posting &&
                 typeof (v as any).posting.title === "string",
-            )?.posting;
+            );
+            const posting = (postingWrapper as any)?.posting;
 
             const ldjsonMatch = html.match(
               /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i,
             );
             let ldjson: any = undefined;
-            if (ldjsonMatch) {
+            if (ldjsonMatch && ldjsonMatch[1]) {
               try {
-                const parsed = JSON.parse(ldjsonMatch[1]);
+                const parsed = JSON.parse(ldjsonMatch[1] as string);
                 ldjson = Array.isArray(parsed)
                   ? parsed.find((x) => x?.["@type"] === "JobPosting")
                   : parsed?.["@type"] === "JobPosting"
@@ -248,27 +248,26 @@ You have tools for:
 
             const base = (posting ?? jobPosting ?? {}) as any;
 
-            const title = base.title || ldjson?.title || "";
-            const descriptionHtml =
+            const title: string = base.title || ldjson?.title || "";
+            const descriptionHtml: string =
               base.descriptionHtml || ldjson?.description || "";
-            const department = base.departmentName ?? null;
-            const team = base.teamName ?? null;
-            const location = base.locationName ?? null;
-            const employmentType =
+            const department: string | null = base.departmentName ?? null;
+            const team: string | null = base.teamName ?? null;
+            const location: string | null = base.locationName ?? null;
+            const employmentType: string | null =
               base.employmentType ?? ldjson?.employmentType ?? null;
-            const publishedDate =
+            const publishedDate: string | null =
               base.publishedDate ?? ldjson?.datePosted ?? null;
-            const compensationTierSummary =
+            const compensationTierSummary: string | null =
               base.compensationTierSummary ?? null;
 
-            // Build apply URL: first try anchor tags, then guess from job URL
             let applyUrl: string | null = null;
             const anchorMatch = html.match(
               /<a[^>]+href=["']([^"']+)["'][^>]*>(?:[^<]*apply[^<]*|[^<]*Apply[^<]*)<\/a>/i,
             );
-            if (anchorMatch) {
+            if (anchorMatch && anchorMatch[1]) {
               try {
-                const abs = anchorMatch[1];
+                const abs = anchorMatch[1] as string;
                 applyUrl = abs.startsWith("http")
                   ? abs
                   : new URL(abs, url).toString();
