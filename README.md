@@ -110,6 +110,27 @@ Output includes:
 - descriptionHtml (best-effort from inline JSON or ld+json)
 - applyUrl (best-effort from anchors on the page)
 
+### read_public_google_doc
+
+Reads content from a public Google Docs link (no auth) using export endpoints or published HTML.
+
+Input:
+
+```json
+{
+  "url": "https://docs.google.com/document/d/<docId>/edit?usp=sharing",
+  "format": "txt"
+}
+```
+
+Notes:
+
+- Requires the doc to be publicly accessible (e.g., "Anyone with the link" or "Published to the web").
+- Supports format: "txt" (default) or "html".
+- For standard Docs links, uses `.../document/d/<docId>/export?format=txt|html`.
+- For published links (`/document/d/e/<pubId>/pub`), fetches embedded HTML and extracts text if `format=txt`.
+- Returns: sourceUrl, resolvedUrl, mode (export|published|raw), format, length, and content (truncated by maxChars if provided).
+
 ## Environment variables
 
 - Local development: `.env.local`

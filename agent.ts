@@ -312,6 +312,89 @@ Leadership questions:
             };
           },
         }),
+
+        read_public_google_doc: tool({
+          description:
+            "Read content from a public Google Docs link. Supports export as text or HTML. No auth required if the doc is publicly accessible.",
+          inputSchema: z.object({
+            url: z.string().url(),
+            format: z.enum(["txt", "html"]).optional(),
+            maxChars: z.number().int().positive().max(500000).optional(),
+          }),
+          execute: async ({ url, format, maxChars }) => {
+            const u = new URL(url);
+            const sourceUrl = u.toString();
+            const fmt = format ?? "txt";
+            const headers = {
+              "User-Agent":
+                "jobs-agent/1.0 (+https://github.com/mattvollmer/jobs-agent)",
+              Accept:
+                fmt === "html"
+                  ? "text/html,application/xhtml+xml"
+                  : "text/plain, text/html;q=0.7",
+            } as const;
+
+            const mDoc = u.pathname.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+            const mPub = u.pathname.match(/\/document\/d\/e\/([a-zA-Z0-9_-]+)/);
+
+            const fetchText = async (endpoint: string) => {
+              const res = await fetch(endpoint, { headers });
+              if (!res.ok)
+                throw new Error(
+                  `Failed to fetch ${endpoint}: ${res.status} ${res.statusText}`,
+                );
+              return res.text();
+            };
+
+            let content = "";
+            let mode: "export" | "published" | "raw" = "raw";
+            let usedUrl = sourceUrl;
+            if (mDoc && mDoc[1]) {
+              // Use export endpoint
+              const docId = mDoc[1];
+              const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=${fmt}`;
+              usedUrl = exportUrl;
+              content = await fetchText(exportUrl);
+              mode = "export";
+            } else if (mPub && mPub[1]) {
+              // Published to web link, fetch embedded HTML and extract text if txt requested
+              const pubId = mPub[1];
+              const pubUrl = `https://docs.google.com/document/d/e/${pubId}/pub?embedded=true`;
+              usedUrl = pubUrl;
+              const html = await fetchText(pubUrl);
+              if (fmt === "html") {
+                content = html;
+              } else {
+                const $ = load(html);
+                const text = $("body").text().replace(/\s+/g, " ").trim();
+                content = text;
+              }
+              mode = "published";
+            } else {
+              // Fallback: fetch whatever is at the URL (must be public) and extract
+              const raw = await fetchText(sourceUrl);
+              if (fmt === "html") {
+                content = raw;
+              } else {
+                const $ = load(raw);
+                content = $("body").text().replace(/\s+/g, " ").trim();
+              }
+              mode = "raw";
+            }
+
+            const limit = maxChars ?? (fmt === "html" ? 200000 : 100000);
+            if (content.length > limit) content = content.slice(0, limit);
+
+            return {
+              sourceUrl,
+              resolvedUrl: usedUrl,
+              mode,
+              format: fmt,
+              length: content.length,
+              content,
+            };
+          },
+        }),
       },
     });
   },
