@@ -317,12 +317,21 @@ Leadership questions:
           description:
             "Read content from a public Google Docs link. Supports export as text or HTML. No auth required if the doc is publicly accessible.",
           inputSchema: z.object({
-            url: z.string().url(),
+            url: z.string().url().optional(),
             format: z.enum(["txt", "html"]).optional(),
             maxChars: z.number().int().positive().max(500000).optional(),
           }),
           execute: async ({ url, format, maxChars }) => {
-            const u = new URL(url);
+            // If URL not provided, try env vars
+            const envSingle = process.env.GOOGLE_DOC_URL;
+            const envMulti = process.env.GOOGLE_DOC_URLS; // comma-separated
+            const chosenUrl = url ?? envSingle ?? (envMulti ? envMulti.split(/\s*,\s*/)[0] : undefined);
+            if (!chosenUrl) {
+              throw new Error(
+                "Missing URL. Provide 'url' or set GOOGLE_DOC_URL (single) or GOOGLE_DOC_URLS (comma-separated).",
+              );
+            }
+            const u = new URL(chosenUrl);
             const sourceUrl = u.toString();
             const fmt = format ?? "txt";
             const headers = {
@@ -339,10 +348,7 @@ Leadership questions:
 
             const fetchText = async (endpoint: string) => {
               const res = await fetch(endpoint, { headers });
-              if (!res.ok)
-                throw new Error(
-                  `Failed to fetch ${endpoint}: ${res.status} ${res.statusText}`,
-                );
+              if (!res.ok) throw new Error(`Failed to fetch ${endpoint}: ${res.status} ${res.statusText}`);
               return res.text();
             };
 

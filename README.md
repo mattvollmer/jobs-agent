@@ -136,6 +136,11 @@ Notes:
 - Local development: `.env.local`
 - Production: `.env.production`
 
+Optional configuration for Google Docs:
+
+- `GOOGLE_DOC_URL`: single default public Doc URL used when the tool is called without a `url`.
+- `GOOGLE_DOC_URLS`: comma-separated list of public Doc URLs; the first will be used by default if `url` isn’t provided.
+
 Do not commit secrets. The `.gitignore` already excludes `.env*`.
 
 ## Project structure
