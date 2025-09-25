@@ -10,6 +10,12 @@ Minimal Blink agent scaffold built with TypeScript and AI SDK v5.
 - TypeScript configuration targeting modern ESNext
 - Bun lockfile committed for reproducible installs
 
+## Behavior
+
+- Broad jobs queries (e.g., "what jobs are open?") return a concise bulleted list of openings with: title, department/team, location, workplaceType (Remote/Hybrid/On-site), compensation summary (if available), and a link to the job listing.
+- Specific role queries (e.g., "are you hiring for Sales Engineer?") filter listings by title (case-insensitive) and return the same bulleted style for matching openings, including links. If none match, the agent reports none found and may suggest related titles.
+- The agent keeps responses brief and links out for full details.
+
 ## Prerequisites
 
 - Bun (recommended) or Node.js 18+
