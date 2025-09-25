@@ -4,7 +4,8 @@ Minimal Blink agent scaffold built with TypeScript and AI SDK v5.
 
 ## Features
 
-- Blink agent with an example tool (`get_ip_info`) that fetches IP information
+- HTML parsing tool using Cheerio (no JS execution)
+- Coder jobs tools: list openings and fetch details from AshbyHQ
 - AI SDK v5 tool-call syntax using `inputSchema`
 - TypeScript configuration targeting modern ESNext
 - Bun lockfile committed for reproducible installs
@@ -30,8 +31,60 @@ npx blink dev
 # Deploy to Blink cloud (staging)
 npx blink deploy
 
-# Deploy to production	npx blink deploy --prod
+# Deploy to production
+npx blink deploy --prod
 ```
+
+## Tools
+
+### fetch_and_parse_html
+
+Fetches a URL and parses HTML to extract metadata, headings, links, and body text.
+
+Input:
+
+```json
+{
+  "url": "https://example.com",
+  "extract": ["title", "description", "headings", "links", "text"],
+  "maxContentChars": 10000
+}
+```
+
+Notes:
+
+- No JavaScript execution; client-rendered pages may be incomplete
+- Adds a User-Agent header
+
+### list_coder_jobs
+
+Lists open roles from Coder's AshbyHQ page.
+
+Output shape:
+
+```json
+{
+  "sourceUrl": "https://jobs.ashbyhq.com/Coder",
+  "count": 3,
+  "jobs": [{ "title": "...", "url": "...", "location": "..." }]
+}
+```
+
+### get_coder_job_details
+
+Fetches details for an individual Coder job posting URL.
+
+Input:
+
+```json
+{ "url": "https://jobs.ashbyhq.com/Coder/<job-id>" }
+```
+
+Output includes:
+
+- title, description, location (best-effort), employmentType, applyUrl
+- structured (raw ld+json JobPosting if present)
+- text (truncated page text)
 
 ## Environment variables
 
@@ -60,7 +113,7 @@ See `AGENTS.md` for additional guidance:
 
 ## Notes
 
-- The example tool `get_ip_info` demonstrates how tools work by calling `https://ipinfo.io/json`.
+- HTML parsing is best-effort and may not capture JS-rendered content
 - Update the agent model, system prompt, and tools in `agent.ts` to suit your use case.
 
 ## License
