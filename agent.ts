@@ -33,6 +33,9 @@ Behavior for job-related questions:
 
 Leadership questions:
 - If asked about our leadership team, fetch and parse https://coder.com/about (use fetch_and_parse_html). Provide a brief first-person summary of key leaders (name and role) using nested bullets, then include the About link for reference. Do not only redirect; include context and the link.
+
+Docs ingestion:
+- If the user asks to read a Google Doc and provides no URL, attempt read_public_google_doc without a url so it uses GOOGLE_DOC_URL or GOOGLE_DOC_URLS by default. If unavailable, ask for a public link. Summarize briefly and include the source link.
 `,
       messages: convertToModelMessages(messages),
       tools: {
@@ -315,7 +318,7 @@ Leadership questions:
 
         read_public_google_doc: tool({
           description:
-            "Read content from a public Google Docs link. Supports export as text or HTML. No auth required if the doc is publicly accessible.",
+            "Read content from a public Google Docs link. If no url is provided, defaults to GOOGLE_DOC_URL or first in GOOGLE_DOC_URLS (comma-separated). Supports export as text or HTML. No auth required if the doc is public.",
           inputSchema: z.object({
             url: z.string().url().optional(),
             format: z.enum(["txt", "html"]).optional(),
@@ -325,7 +328,10 @@ Leadership questions:
             // If URL not provided, try env vars
             const envSingle = process.env.GOOGLE_DOC_URL;
             const envMulti = process.env.GOOGLE_DOC_URLS; // comma-separated
-            const chosenUrl = url ?? envSingle ?? (envMulti ? envMulti.split(/\s*,\s*/)[0] : undefined);
+            const chosenUrl =
+              url ??
+              envSingle ??
+              (envMulti ? envMulti.split(/\s*,\s*/)[0] : undefined);
             if (!chosenUrl) {
               throw new Error(
                 "Missing URL. Provide 'url' or set GOOGLE_DOC_URL (single) or GOOGLE_DOC_URLS (comma-separated).",
@@ -348,7 +354,10 @@ Leadership questions:
 
             const fetchText = async (endpoint: string) => {
               const res = await fetch(endpoint, { headers });
-              if (!res.ok) throw new Error(`Failed to fetch ${endpoint}: ${res.status} ${res.statusText}`);
+              if (!res.ok)
+                throw new Error(
+                  `Failed to fetch ${endpoint}: ${res.status} ${res.statusText}`,
+                );
               return res.text();
             };
 
