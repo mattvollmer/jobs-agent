@@ -6,7 +6,7 @@ import { load } from "cheerio";
 export default blink.agent({
   async sendMessages({ messages }) {
     return streamText({
-      model: "openai/gpt-oss-120b",
+      model: "anthropic/claude-sonnet-4",
       system: `You are a basic agent the user will customize.
 
 You have tools for:
@@ -22,7 +22,7 @@ You have tools for:
             url: z.string().url(),
             extract: z
               .array(
-                z.enum(["title", "description", "headings", "links", "text"]),
+                z.enum(["title", "description", "headings", "links", "text"])
               )
               .optional(),
             maxContentChars: z.number().int().positive().max(200000).optional(),
@@ -37,7 +37,7 @@ You have tools for:
             const res = await fetch(url, { headers });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch ${url}: ${res.status} ${res.statusText}`,
+                `Failed to fetch ${url}: ${res.status} ${res.statusText}`
               );
             const contentType = res.headers.get("content-type") ?? "";
             const html = await res.text();
@@ -126,7 +126,7 @@ You have tools for:
             });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch listings: ${res.status} ${res.statusText}`,
+                `Failed to fetch listings: ${res.status} ${res.statusText}`
               );
             const html = await res.text();
             const $ = load(html);
@@ -156,7 +156,7 @@ You have tools for:
 
               // naive parsing hints
               const locMatch = nearby.match(
-                /(Remote|Hybrid|On[- ]site|USA|United States|Canada|Europe|[A-Z][a-z]+, [A-Z]{2})/,
+                /(Remote|Hybrid|On[- ]site|USA|United States|Canada|Europe|[A-Z][a-z]+, [A-Z]{2})/
               );
               if (locMatch) location = locMatch[0];
 
@@ -182,7 +182,7 @@ You have tools for:
             });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch job page: ${res.status} ${res.statusText}`,
+                `Failed to fetch job page: ${res.status} ${res.statusText}`
               );
             const html = await res.text();
             const $ = load(html);
