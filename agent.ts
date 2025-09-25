@@ -7,16 +7,11 @@ export default blink.agent({
   async sendMessages({ messages }) {
     return streamText({
       model: "anthropic/claude-sonnet-4",
-      system: `You are a basic agent the user will customize.
+      system: `You are OllieBot, a friendly bot designed to help job seekers find and learn about open roles at Coder.
 
 You have tools for:
 - Fetching and parsing HTML content (no JS execution)
 - Listing Coder job openings and fetching details for a specific job
-
-Scope and off-topic handling:
-- Only assist with topics related to Coder (the company at coder.com) and Coder job openings.
-- If the user asks for unrelated browsing or general chat, reply politely that you are focused on Coder and Coder roles, then offer to help with open positions or role-specific questions. Do not proceed with unrelated tasks.
-- Only call tools when they directly support Coder-related queries.
 
 Behavior for job-related questions:
 - If asked broadly (e.g., "what jobs are open?"), call list_coder_jobs and return a concise bulleted list using nested bullets:
@@ -39,7 +34,7 @@ Behavior for job-related questions:
             url: z.string().url(),
             extract: z
               .array(
-                z.enum(["title", "description", "headings", "links", "text"]),
+                z.enum(["title", "description", "headings", "links", "text"])
               )
               .optional(),
             maxContentChars: z.number().int().positive().max(200000).optional(),
@@ -54,7 +49,7 @@ Behavior for job-related questions:
             const res = await fetch(url, { headers });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch ${url}: ${res.status} ${res.statusText}`,
+                `Failed to fetch ${url}: ${res.status} ${res.statusText}`
               );
             const contentType = res.headers.get("content-type") ?? "";
             const html = await res.text();
@@ -144,7 +139,7 @@ Behavior for job-related questions:
             });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch listings: ${res.status} ${res.statusText}`,
+                `Failed to fetch listings: ${res.status} ${res.statusText}`
               );
             const html = await res.text();
 
@@ -168,7 +163,7 @@ Behavior for job-related questions:
               isListed: (p.isListed as boolean) ?? null,
               publishedDate: (p.publishedDate as string) ?? null,
               compensationTierSummary: p.shouldDisplayCompensationOnJobBoard
-                ? ((p.compensationTierSummary as string) ?? null)
+                ? (p.compensationTierSummary as string) ?? null
                 : null,
               jobUrl: `${sourceUrl}/${p.id}`,
             }));
@@ -191,12 +186,12 @@ Behavior for job-related questions:
             });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch job page: ${res.status} ${res.statusText}`,
+                `Failed to fetch job page: ${res.status} ${res.statusText}`
               );
             const html = await res.text();
 
             const appDataMatch = html.match(
-              /window\.__appData\s*=\s*(\{[\s\S]*?\});/,
+              /window\.__appData\s*=\s*(\{[\s\S]*?\});/
             );
             if (!appDataMatch || !appDataMatch[1])
               throw new Error("Ashby inline appData not found on job page");
@@ -237,7 +232,7 @@ Behavior for job-related questions:
                 typeof v === "object" &&
                 (v as any).id &&
                 typeof (v as any).title === "string" &&
-                (jobId ? (v as any).id === jobId : true),
+                (jobId ? (v as any).id === jobId : true)
             );
 
             const postingWrapper = deepFind(
@@ -246,12 +241,12 @@ Behavior for job-related questions:
                 v &&
                 typeof v === "object" &&
                 (v as any).posting &&
-                typeof (v as any).posting.title === "string",
+                typeof (v as any).posting.title === "string"
             );
             const posting = (postingWrapper as any)?.posting;
 
             const ldjsonMatch = html.match(
-              /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i,
+              /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i
             );
             let ldjson: any = undefined;
             if (ldjsonMatch && ldjsonMatch[1]) {
@@ -260,8 +255,8 @@ Behavior for job-related questions:
                 ldjson = Array.isArray(parsed)
                   ? parsed.find((x) => x?.["@type"] === "JobPosting")
                   : parsed?.["@type"] === "JobPosting"
-                    ? parsed
-                    : undefined;
+                  ? parsed
+                  : undefined;
               } catch {}
             }
 
@@ -282,7 +277,7 @@ Behavior for job-related questions:
 
             let applyUrl: string | null = null;
             const anchorMatch = html.match(
-              /<a[^>]+href=["']([^"']+)["'][^>]*>(?:[^<]*apply[^<]*|[^<]*Apply[^<]*)<\/a>/i,
+              /<a[^>]+href=["']([^"']+)["'][^>]*>(?:[^<]*apply[^<]*|[^<]*Apply[^<]*)<\/a>/i
             );
             if (anchorMatch && anchorMatch[1]) {
               try {
