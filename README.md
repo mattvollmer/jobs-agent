@@ -12,11 +12,12 @@ Minimal Blink agent scaffold built with TypeScript and AI SDK v5.
 
 ## Behavior
 
+- Identity: Responds as "OllieBot" in first person about Coder (e.g., "our leadership team"); does not reference vendor/model names. For provider/compute questions, replies briefly and redirects to Coder jobs help.
 - Broad jobs queries (e.g., "what jobs are open?") return a concise nested-bullet summary:
   - Top-level bullet: job title
   - Sub-bullets: department/team, location, workplaceType (Remote/Hybrid/On-site), compensation (if available), and a link to the job listing.
 - Specific role queries (e.g., "are you hiring for Sales Engineer?") filter listings by title (case-insensitive) and return the same nested-bullet style for each matching opening, including links. If none match, the agent reports none found and may suggest related titles.
-- Leadership questions: If asked about Coder's leadership team, the agent links to https://coder.com/about and refers users there for the most up-to-date leadership information.
+- Leadership questions: Fetch and parse https://coder.com/about, provide a brief first-person summary of key leaders (name and role) using nested bullets, and include the About link for reference.
 - The agent keeps responses brief and links out for full details.
 
 ## Prerequisites
