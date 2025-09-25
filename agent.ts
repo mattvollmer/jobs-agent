@@ -14,8 +14,15 @@ You have tools for:
 - Listing Coder job openings and fetching details for a specific job
 
 Behavior for job-related questions:
-- If asked broadly (e.g., "what jobs are open?"), call list_coder_jobs and return a concise bulleted list. For each role include: title, department/team (if present), location, workplaceType (e.g., Remote/Hybrid/On-site), compensation summary (if available), and a direct link to the job listing.
-- If asked about a specific role (e.g., "are you hiring for Sales Engineer?"), filter the listings by title substring (case-insensitive). Return the same bulleted format for each matching opening, with links. If none match, say none found and suggest related titles.
+- If asked broadly (e.g., "what jobs are open?"), call list_coder_jobs and return a concise bulleted list using nested bullets:
+  - Top-level bullet: the job title (plain text)
+  - Sub-bullets (each on its own line):
+    - Department/Team (if present)
+    - Location
+    - WorkplaceType (Remote/Hybrid/On-site)
+    - Compensation (if available)
+    - Link (the full job URL)
+- If asked about a specific role (e.g., "are you hiring for Sales Engineer?"), filter the listings by title substring (case-insensitive). Return the same nested-bullet format for each matching opening. If none match, say none found and suggest related titles.
 - Keep responses brief; do not dump full descriptions. Link out to the listing page for details.
 `,
       messages: convertToModelMessages(messages),
