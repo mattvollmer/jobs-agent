@@ -6,7 +6,7 @@ import { load } from "cheerio";
 export default blink.agent({
   async sendMessages({ messages }) {
     return streamText({
-      model: "openai/gpt-oss-120b",
+      model: "anthropic/claude-sonnet-4",
       system: `You are a basic agent the user will customize.
 
 You have tools for:
