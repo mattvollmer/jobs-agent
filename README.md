@@ -5,7 +5,7 @@ Minimal Blink agent scaffold built with TypeScript and AI SDK v5.
 ## Features
 
 - HTML parsing tool using Cheerio (no JS execution)
-- Coder jobs tools: list openings and fetch details from AshbyHQ
+- Coder jobs tools: list openings and fetch details from AshbyHQ (parses inline JSON, no JS)
 - AI SDK v5 tool-call syntax using `inputSchema`
 - TypeScript configuration targeting modern ESNext
 - Bun lockfile committed for reproducible installs
@@ -58,7 +58,7 @@ Notes:
 
 ### list_coder_jobs
 
-Lists open roles from Coder's AshbyHQ page.
+Lists open roles from Coder's AshbyHQ page by parsing the inline `window.__appData` JSON payload.
 
 Output shape:
 
@@ -66,13 +66,26 @@ Output shape:
 {
   "sourceUrl": "https://jobs.ashbyhq.com/Coder",
   "count": 3,
-  "jobs": [{ "title": "...", "url": "...", "location": "..." }]
+  "jobs": [
+    {
+      "id": "<uuid>",
+      "title": "...",
+      "department": "...",
+      "team": "...",
+      "location": "...",
+      "workplaceType": "Remote",
+      "employmentType": "FullTime",
+      "publishedDate": "2025-08-20",
+      "compensationTierSummary": "...",
+      "jobUrl": "https://jobs.ashbyhq.com/Coder/<uuid>"
+    }
+  ]
 }
 ```
 
 ### get_coder_job_details
 
-Fetches details for an individual Coder job posting URL.
+Fetches details for an individual Coder job posting URL by parsing inline JSON (and structured ld+json if present).
 
 Input:
 
@@ -82,9 +95,10 @@ Input:
 
 Output includes:
 
-- title, description, location (best-effort), employmentType, applyUrl
-- structured (raw ld+json JobPosting if present)
-- text (truncated page text)
+- id, title, department/team, location, employmentType, publishedDate
+- compensationTierSummary (if available)
+- descriptionHtml (best-effort from inline JSON or ld+json)
+- applyUrl (best-effort from anchors on the page)
 
 ## Environment variables
 
@@ -114,6 +128,7 @@ See `AGENTS.md` for additional guidance:
 ## Notes
 
 - HTML parsing is best-effort and may not capture JS-rendered content
+- Ashby jobs parsing uses inline JSON and does not execute JS
 - Update the agent model, system prompt, and tools in `agent.ts` to suit your use case.
 
 ## License
