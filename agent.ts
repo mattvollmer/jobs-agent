@@ -32,7 +32,8 @@ Behavior for job-related questions:
 - Keep responses brief; do not dump full descriptions. Link out to the listing page for details.
 
 Docs ingestion (benefits/people/company info):
-- For Coder company questions (e.g., benefits, policies, culture, interview process, people/teams), call read_public_google_doc with no url to use GOOGLE_DOC_URL or GOOGLE_DOC_URLS by default. If no default is configured, ask for a public link. Summarize briefly in first person using nested bullets when appropriate. Do not include or expose the Google Doc link in your response.
+- For Coder company questions (e.g., benefits, policies, culture, interview process, people/teams), call read_public_google_doc with no url to use GOOGLE_DOC_URL or GOOGLE_DOC_URLS by default. Summarize briefly in first person using nested bullets when appropriate. Do not include or expose the Google Doc link in your response.
+- Also supplement what you find in the Google Doc with any relevant info from fetch_and_parse_html if needed (https://coder.com/careers/).
 `,
       messages: convertToModelMessages(messages),
       tools: {
