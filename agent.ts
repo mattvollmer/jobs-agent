@@ -45,7 +45,7 @@ Docs ingestion (benefits/people/company info):
             url: z.string().url(),
             extract: z
               .array(
-                z.enum(["title", "description", "headings", "links", "text"])
+                z.enum(["title", "description", "headings", "links", "text"]),
               )
               .optional(),
             maxContentChars: z.number().int().positive().max(200000).optional(),
@@ -60,7 +60,7 @@ Docs ingestion (benefits/people/company info):
             const res = await fetch(url, { headers });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch ${url}: ${res.status} ${res.statusText}`
+                `Failed to fetch ${url}: ${res.status} ${res.statusText}`,
               );
             const contentType = res.headers.get("content-type") ?? "";
             const html = await res.text();
@@ -77,11 +77,7 @@ Docs ingestion (benefits/people/company info):
               maxContentChars: maxContentChars ?? 10000,
             } as const;
 
-            const out: any = {
-              url,
-              status: res.status,
-              contentType,
-            };
+            const out: any = { url, status: res.status, contentType };
 
             if (opts.extract.includes("title")) {
               out.title = (
@@ -105,10 +101,7 @@ Docs ingestion (benefits/people/company info):
                   .map((_, el) => $(el).text().trim())
                   .get()
                   .filter(Boolean);
-              out.headings = {
-                h1: pick("h1"),
-                h2: pick("h2"),
-              };
+              out.headings = { h1: pick("h1"), h2: pick("h2") };
             }
 
             if (opts.extract.includes("links")) {
@@ -137,10 +130,29 @@ Docs ingestion (benefits/people/company info):
 
         list_coder_jobs: tool({
           description:
-            "List open roles from Coder's AshbyHQ page (parses inline JSON, no JS).",
-          inputSchema: z.object({}),
-          execute: async () => {
+            "List open roles from Coder's AshbyHQ page (parses inline JSON, no JS). Uses cache with TTL.",
+          inputSchema: z.object({
+            force: z.boolean().optional(),
+            ttlSeconds: z.number().int().positive().max(86400).optional(),
+          }),
+          execute: async ({ force, ttlSeconds }) => {
             const sourceUrl = "https://jobs.ashbyhq.com/Coder";
+            const cacheKey = "jobs:list_coder_jobs";
+            const now = Date.now();
+            const ttl = ttlSeconds ?? 900;
+
+            if (!force) {
+              const cached = await blink.storage.kv.get(cacheKey);
+              if (cached) {
+                try {
+                  const obj = JSON.parse(cached);
+                  if (obj.expiresAt && obj.expiresAt > now && obj.payload) {
+                    return { ...obj.payload, cached: true };
+                  }
+                } catch {}
+              }
+            }
+
             const res = await fetch(sourceUrl, {
               headers: {
                 "User-Agent":
@@ -150,14 +162,13 @@ Docs ingestion (benefits/people/company info):
             });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch listings: ${res.status} ${res.statusText}`
+                `Failed to fetch listings: ${res.status} ${res.statusText}`,
               );
             const html = await res.text();
 
             const m = html.match(/window\.__appData\s*=\s*(\{[\s\S]*?\});/);
             if (!m || !m[1]) throw new Error("Ashby inline appData not found");
-            const jsonText = m[1];
-            const appData = JSON.parse(jsonText as string);
+            const appData = JSON.parse(m[1]);
 
             const postings =
               (appData as any)?.jobBoard?.jobPostings ??
@@ -174,12 +185,15 @@ Docs ingestion (benefits/people/company info):
               isListed: (p.isListed as boolean) ?? null,
               publishedDate: (p.publishedDate as string) ?? null,
               compensationTierSummary: p.shouldDisplayCompensationOnJobBoard
-                ? (p.compensationTierSummary as string) ?? null
+                ? ((p.compensationTierSummary as string) ?? null)
                 : null,
               jobUrl: `${sourceUrl}/${p.id}`,
             }));
 
-            return { sourceUrl, count: jobs.length, jobs };
+            const payload = { sourceUrl, count: jobs.length, jobs };
+            const record = { expiresAt: now + ttl * 1000, payload };
+            await blink.storage.kv.set(cacheKey, JSON.stringify(record));
+            return payload;
           },
         }),
 
@@ -197,12 +211,12 @@ Docs ingestion (benefits/people/company info):
             });
             if (!res.ok)
               throw new Error(
-                `Failed to fetch job page: ${res.status} ${res.statusText}`
+                `Failed to fetch job page: ${res.status} ${res.statusText}`,
               );
             const html = await res.text();
 
             const appDataMatch = html.match(
-              /window\.__appData\s*=\s*(\{[\s\S]*?\});/
+              /window\.__appData\s*=\s*(\{[\s\S]*?\});/,
             );
             if (!appDataMatch || !appDataMatch[1])
               throw new Error("Ashby inline appData not found on job page");
@@ -243,7 +257,7 @@ Docs ingestion (benefits/people/company info):
                 typeof v === "object" &&
                 (v as any).id &&
                 typeof (v as any).title === "string" &&
-                (jobId ? (v as any).id === jobId : true)
+                (jobId ? (v as any).id === jobId : true),
             );
 
             const postingWrapper = deepFind(
@@ -252,12 +266,12 @@ Docs ingestion (benefits/people/company info):
                 v &&
                 typeof v === "object" &&
                 (v as any).posting &&
-                typeof (v as any).posting.title === "string"
+                typeof (v as any).posting.title === "string",
             );
             const posting = (postingWrapper as any)?.posting;
 
             const ldjsonMatch = html.match(
-              /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i
+              /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i,
             );
             let ldjson: any = undefined;
             if (ldjsonMatch && ldjsonMatch[1]) {
@@ -266,8 +280,8 @@ Docs ingestion (benefits/people/company info):
                 ldjson = Array.isArray(parsed)
                   ? parsed.find((x) => x?.["@type"] === "JobPosting")
                   : parsed?.["@type"] === "JobPosting"
-                  ? parsed
-                  : undefined;
+                    ? parsed
+                    : undefined;
               } catch {}
             }
 
@@ -288,7 +302,7 @@ Docs ingestion (benefits/people/company info):
 
             let applyUrl: string | null = null;
             const anchorMatch = html.match(
-              /<a[^>]+href=["']([^"']+)["'][^>]*>(?:[^<]*apply[^<]*|[^<]*Apply[^<]*)<\/a>/i
+              /<a[^>]+href=["']([^"']+)["'][^>]*>(?:[^<]*apply[^<]*|[^<]*Apply[^<]*)<\/a>/i,
             );
             if (anchorMatch && anchorMatch[1]) {
               try {
@@ -317,13 +331,15 @@ Docs ingestion (benefits/people/company info):
 
         read_public_google_doc: tool({
           description:
-            "Read content from a public Google Docs link. If no url is provided, defaults to GOOGLE_DOC_URL or first in GOOGLE_DOC_URLS (comma-separated). Supports export as text or HTML. No auth required if the doc is public.",
+            "Read content from a public Google Docs link. If no url is provided, defaults to GOOGLE_DOC_URL or first in GOOGLE_DOC_URLS (comma-separated). Supports export as text or HTML. No auth required if the doc is public. Uses cache with TTL.",
           inputSchema: z.object({
             url: z.string().url().optional(),
             format: z.enum(["txt", "html"]).optional(),
             maxChars: z.number().int().positive().max(500000).optional(),
+            force: z.boolean().optional(),
+            ttlSeconds: z.number().int().positive().max(86400).optional(),
           }),
-          execute: async ({ url, format, maxChars }) => {
+          execute: async ({ url, format, maxChars, force, ttlSeconds }) => {
             // If URL not provided, try env vars
             const envSingle = process.env.GOOGLE_DOC_URL;
             const envMulti = process.env.GOOGLE_DOC_URLS; // comma-separated
@@ -333,7 +349,7 @@ Docs ingestion (benefits/people/company info):
               (envMulti ? envMulti.split(/\s*,\s*/)[0] : undefined);
             if (!chosenUrl) {
               throw new Error(
-                "Missing URL. Provide 'url' or set GOOGLE_DOC_URL (single) or GOOGLE_DOC_URLS (comma-separated)."
+                "Missing URL. Provide 'url' or set GOOGLE_DOC_URL (single) or GOOGLE_DOC_URLS (comma-separated).",
               );
             }
             const u = new URL(chosenUrl);
@@ -348,6 +364,29 @@ Docs ingestion (benefits/people/company info):
                   : "text/plain, text/html;q=0.7",
             } as const;
 
+            const cacheKey = `gdoc:${sourceUrl}|fmt:${fmt}`;
+            const now = Date.now();
+            const ttl = ttlSeconds ?? 900; // 15 minutes default
+            if (!force) {
+              const cached = await blink.storage.kv.get(cacheKey);
+              if (cached) {
+                try {
+                  const obj = JSON.parse(cached);
+                  if (obj.expiresAt && obj.expiresAt > now && obj.content) {
+                    return {
+                      sourceUrl,
+                      resolvedUrl: obj.resolvedUrl ?? sourceUrl,
+                      mode: obj.mode ?? "export",
+                      format: fmt,
+                      length: obj.content.length,
+                      content: obj.content,
+                      cached: true,
+                    };
+                  }
+                } catch {}
+              }
+            }
+
             const mDoc = u.pathname.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
             const mPub = u.pathname.match(/\/document\/d\/e\/([a-zA-Z0-9_-]+)/);
 
@@ -355,7 +394,7 @@ Docs ingestion (benefits/people/company info):
               const res = await fetch(endpoint, { headers });
               if (!res.ok)
                 throw new Error(
-                  `Failed to fetch ${endpoint}: ${res.status} ${res.statusText}`
+                  `Failed to fetch ${endpoint}: ${res.status} ${res.statusText}`,
                 );
               return res.text();
             };
@@ -364,14 +403,12 @@ Docs ingestion (benefits/people/company info):
             let mode: "export" | "published" | "raw" = "raw";
             let usedUrl = sourceUrl;
             if (mDoc && mDoc[1]) {
-              // Use export endpoint
               const docId = mDoc[1];
               const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=${fmt}`;
               usedUrl = exportUrl;
               content = await fetchText(exportUrl);
               mode = "export";
             } else if (mPub && mPub[1]) {
-              // Published to web link, fetch embedded HTML and extract text if txt requested
               const pubId = mPub[1];
               const pubUrl = `https://docs.google.com/document/d/e/${pubId}/pub?embedded=true`;
               usedUrl = pubUrl;
@@ -385,7 +422,6 @@ Docs ingestion (benefits/people/company info):
               }
               mode = "published";
             } else {
-              // Fallback: fetch whatever is at the URL (must be public) and extract
               const raw = await fetchText(sourceUrl);
               if (fmt === "html") {
                 content = raw;
@@ -398,6 +434,14 @@ Docs ingestion (benefits/people/company info):
 
             const limit = maxChars ?? (fmt === "html" ? 200000 : 100000);
             if (content.length > limit) content = content.slice(0, limit);
+
+            const record = {
+              expiresAt: now + ttl * 1000,
+              content,
+              resolvedUrl: usedUrl,
+              mode,
+            };
+            await blink.storage.kv.set(cacheKey, JSON.stringify(record));
 
             return {
               sourceUrl,
