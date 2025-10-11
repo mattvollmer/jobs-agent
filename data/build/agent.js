@@ -130139,7 +130139,7 @@ var { root: root2 } = static_exports;
 var agent2 = agent();
 agent2.on("chat", async ({ messages }) => {
   return streamText2({
-    model: model("anthropic/claude-sonnet-4"),
+    model: model("anthropic/claude-sonnet-4.5"),
     system: `You are OllieBot, a friendly bot designed to help job seekers find and learn about open roles at Coder.
 
 You have tools for:

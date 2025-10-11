@@ -27,7 +27,7 @@ Behavior for job-related questions:
   - Sub-bullets (each on its own line):
     - Department/Team (if present)
     - Location
-    - WorkplaceType (Remote/Hybrid/On-site)
+    - Workplace (Remote/Hybrid/On-site)
     - Compensation (if available)
     - Link (the full job URL)
 - If asked about a specific role (e.g., "are you hiring for Sales Engineer?"), filter the listings by title substring (case-insensitive). Return the same nested-bullet format for each matching opening. If none match, say none found and suggest related titles.
