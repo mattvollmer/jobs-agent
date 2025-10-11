@@ -4,11 +4,12 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@types/node": "^24.5.2",
-    "ai": "^5.0.52",
-    "blink": "^0.1.50",
+    "@types/node": "^24.7.2",
+    "ai": "^5.0.68",
+    "blink": "^0.1.113",
+    "cheerio": "1.0.0-rc.12",
     "esbuild": "^0.25.10",
-    "zod": "^4.1.11",
-    "cheerio": "1.0.0-rc.12"
+    "typescript": "^5.9.3",
+    "zod": "^4.1.12"
   }
 }
