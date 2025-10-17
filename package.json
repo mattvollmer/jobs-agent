@@ -4,9 +4,10 @@
   "type": "module",
   "private": true,
   "dependencies": {
+    "@ai-sdk/anthropic": "^1.0.6",
     "@types/node": "^24.7.2",
     "ai": "^5.0.68",
-    "blink": "^0.1.113",
+    "blink": "^1.1.20",
     "cheerio": "1.0.0-rc.12",
     "esbuild": "^0.25.10",
     "typescript": "^5.9.3",

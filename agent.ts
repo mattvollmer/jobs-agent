@@ -3,11 +3,11 @@ import * as blink from "blink";
 import { z } from "zod";
 import { load } from "cheerio";
 
-const agent = blink.agent();
+const agent = new blink.Agent();
 
 agent.on("chat", async ({ messages }) => {
   return streamText({
-    model: blink.model("anthropic/claude-sonnet-4.5"),
+    model: "anthropic/claude-sonnet-4.5",
     system: `You are OllieBot, a friendly bot designed to help job seekers find and learn about open roles at Coder.
 
 You have tools for:
