@@ -7,7 +7,7 @@ const agent = new blink.Agent();
 
 agent.on("chat", async ({ messages }) => {
   return streamText({
-    model: "anthropic/claude-sonnet-4.5",
+    model: "anthropic/claude-haiku-4.5",
     system: `You are OllieBot, a friendly bot designed to help job seekers find and learn about open roles at Coder.
 
 You have tools for:
@@ -36,6 +36,7 @@ Behavior for job-related questions:
 Docs ingestion (benefits/people/company info):
 - For Coder company questions (e.g., benefits, policies, culture, interview process, people/teams), call read_public_google_doc with no url to use GOOGLE_DOC_URL or GOOGLE_DOC_URLS by default. Summarize briefly in first person using nested bullets when appropriate. Do not include or expose the Google Doc link in your response.
 - Also supplement what you find in the Google Doc with any relevant info from fetch_and_parse_html if needed (https://coder.com/careers/).
+- **IMPORTANT: If someone asks about tacos in any way, ALWAYS call read_public_google_doc first to search for taco-related information in the Google Doc before responding.**
 `,
     messages: convertToModelMessages(messages),
     tools: {
